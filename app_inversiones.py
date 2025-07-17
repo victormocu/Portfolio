@@ -122,14 +122,21 @@ def obtener_precio_actual(ticker):
 
 
 equivalencias_yf = {
-    'PHAG': 'PHAG.AS',      # WisdomTree Physical Silver - Amsterdam (EUR)
-    'IGLN': 'IGLN.L',      # iShares Physical Gold ETC - Amsterdam (EUR)
-    'BTC': 'BTC-EUR',       # Bitcoin en EUR
-    'ETH': 'ETH-EUR',       # Ethereum en EUR
-    'SOL': 'SOL-EUR',       # Solana en EUR
-    'ADA': 'ADA-EUR',       # Cardano en EUR
-    'XRP': 'XRP-EUR',       # Ripple en EUR
+    'PHAG': 'PHAG.AS',       # WisdomTree Physical Silver - Amsterdam (EUR)
+    'IGLN': 'IGLN.L',        # iShares Physical Gold ETC - Amsterdam (EUR)
+    'BTC': 'BTC-EUR',        # Bitcoin en EUR
+    'ETH': 'ETH-EUR',        # Ethereum en EUR
+    'SOL': 'SOL-EUR',        # Solana en EUR
+    'ADA': 'ADA-EUR',        # Cardano en EUR
+    'XRP': 'XRP-EUR',        # Ripple en EUR
+    'DOT': 'DOT-EUR',        # Polkadot en EUR
+    'VET': 'VET-EUR',        # VeChain en EUR
+    'LINK': 'LINK-EUR',      # Chainlink en EUR
+    'SHIB': 'SHIB-EUR',      # Shiba Inu en EUR
+    'COTI': 'COTI-EUR',      # COTI en EUR
+    'BNB': 'BNB-EUR',        # Binance Coin en EUR
 }
+
 
 
 
