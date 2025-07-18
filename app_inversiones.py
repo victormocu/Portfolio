@@ -981,7 +981,7 @@ with tab6:
         df["fecha"] = pd.to_datetime(df["fecha"])
         df["año"] = df["fecha"].dt.year
 
-        # ---------------------------------------------------
+        # ------------------------------------
         # Generar detalle FIFO por cada tramo de venta
         detalle_fifo = []
 
@@ -1018,6 +1018,7 @@ with tab6:
 
                         detalle_fifo.append({
                             "Activo": activo,
+                            "Tipo Activo": fila.get('tipo_activo', 'Desconocido'),
                             "Fecha venta": fecha,
                             "Año": fecha.year,
                             "Cantidad vendida": cantidad_vendida,
@@ -1028,26 +1029,34 @@ with tab6:
 
         df_detalle_fifo = pd.DataFrame(detalle_fifo)
 
+        # Filtro por tipo_activo
+        tipo_activos_disponibles = df_detalle_fifo['Tipo Activo'].dropna().unique()
+        tipo_activo_seleccionado = st.multiselect(
+            "Filtrar por tipo de activo",
+            options=sorted(tipo_activos_disponibles),
+            default=list(sorted(tipo_activos_disponibles))
+        )
+
+        df_detalle_fifo_filtrado_tipo = df_detalle_fifo[df_detalle_fifo['Tipo Activo'].isin(tipo_activo_seleccionado)]
+
         # --- FILTRO AÑO PARA EL RESUMEN ---
-        años_disponibles_resumen = df_detalle_fifo['Año'].unique()
+        años_disponibles_resumen = df_detalle_fifo_filtrado_tipo['Año'].unique()
         año_seleccionado_resumen = st.selectbox(
             "Filtrar resumen por año fiscal",
             options=sorted(años_disponibles_resumen)
         )
 
         # Resumen por activo y año, sumando valores del detalle FIFO
-        resumen_hacienda = df_detalle_fifo.groupby(['Activo', 'Año']).agg(
+        resumen_hacienda = df_detalle_fifo_filtrado_tipo.groupby(['Activo', 'Año']).agg(
             **{
-                'Total Compras (€)': ('Precio medio compra (€)', lambda x: (x * df_detalle_fifo.loc[x.index, 'Cantidad vendida']).sum()),
-                'Total Ventas (€)': ('Precio venta (€)', lambda x: (x * df_detalle_fifo.loc[x.index, 'Cantidad vendida']).sum()),
+                'Total Compras (€)': ('Precio medio compra (€)', lambda x: (x * df_detalle_fifo_filtrado_tipo.loc[x.index, 'Cantidad vendida']).sum()),
+                'Total Ventas (€)': ('Precio venta (€)', lambda x: (x * df_detalle_fifo_filtrado_tipo.loc[x.index, 'Cantidad vendida']).sum()),
                 'Ganancia/Pérdida Realizada (€)': ('Balance (€)', 'sum')
             }
         ).reset_index()
 
-        # Filtrar resumen por año seleccionado
         df_resumen_filtrado = resumen_hacienda[resumen_hacienda['Año'] == año_seleccionado_resumen]
 
-        # Mostrar resumen filtrado
         st.dataframe(
             df_resumen_filtrado.style.format({
                 "Total Compras (€)": "€{:.2f}",
@@ -1090,9 +1099,22 @@ with tab6:
             index=list(sorted(años_disponibles_detalle)).index(año_seleccionado_resumen),
             key='filtro_detalle_fifo'
         )
-
-        df_detalle_filtrado = df_detalle_fifo[df_detalle_fifo['Año'] == año_seleccionado_detalle]
-
+        
+        # FILTRO TIPO_ACTIVO PARA EL DETALLE FIFO (DEBAJO DEL TÍTULO)
+        tipo_activos_disponibles_detalle = df_detalle_fifo['Tipo Activo'].dropna().unique()
+        tipo_activo_seleccionado_detalle = st.multiselect(
+            "Filtrar detalle FIFO por tipo de activo",
+            options=sorted(tipo_activos_disponibles_detalle),
+            default=list(sorted(tipo_activos_disponibles_detalle)),
+            key='filtro_tipo_activo_detalle'
+        )
+        
+        # Filtrar por año y tipo_activo seleccionados
+        df_detalle_filtrado = df_detalle_fifo[
+            (df_detalle_fifo['Año'] == año_seleccionado_detalle) &
+            (df_detalle_fifo['Tipo Activo'].isin(tipo_activo_seleccionado_detalle))
+        ]
+        
         st.dataframe(
             df_detalle_filtrado.style.format({
                 "Precio medio compra (€)": "€{:.4f}",
@@ -1102,7 +1124,7 @@ with tab6:
             }),
             use_container_width=True
         )
-
+        
         # Descargar detalle FIFO CSV
         csv_detalle = df_detalle_filtrado.to_csv(index=False).encode('utf-8')
         st.download_button(
@@ -1111,7 +1133,7 @@ with tab6:
             file_name=f"detalle_fifo_ventas_{año_seleccionado_detalle}.csv",
             mime="text/csv"
         )
-
+        
         # Descargar detalle FIFO Excel
         output_detalle_excel = io.BytesIO()
         with pd.ExcelWriter(output_detalle_excel, engine='xlsxwriter') as writer:
