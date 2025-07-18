@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jul 14 12:02:26 2025
+Created on Mon Jul 18 2025
 
 @author: UIN
 """
@@ -135,8 +135,8 @@ equivalencias_yf = {
     'SHIB': 'SHIB-EUR',      # Shiba Inu en EUR
     'COTI': 'COTI-EUR',      # COTI en EUR
     'BNB': 'BNB-EUR',        # Binance Coin en EUR
+    'LTC': 'LTC-EUR',        # Litecoin en EUR
 }
-
 
 
 
@@ -388,6 +388,7 @@ with tab1:
 
 
 # --- Segunda ventana: Precios actuales ---
+
 with tab2:
     st.subheader("Precios actuales de tus activos en cartera")
 
@@ -543,8 +544,10 @@ with tab3:
             }), use_container_width=True)
 
             st.divider()
+            
+            
 
-            # --- GRAFICOS VISUALES ---
+            # --- Resumen Global ---
             st.markdown("### Visualización de tu cartera")
             
             # --- Tabla Resumen Avanzada: Posiciones Abiertas, Cerradas y Global por Activo ---
@@ -657,8 +660,129 @@ with tab3:
             )
             
             st.plotly_chart(fig_barras, use_container_width=True)
-
             
+            
+            # --- Nueva tabla solo con ROI ---
+            roi_tabla = []
+            
+            for idx, row in df_resumen.iterrows():
+                activo = row["Activo"]
+                pa = row["PNL No Realizado (€)"] if row["Posición Abierta"] > 0 else 0
+                pc = row["Ganancia/Pérdida Realizada (€)"]
+                pg = pa + pc
+            
+                valor_compra = row["Valor Compra (€)"]
+                inversion_ventas = row["Inversión en Ventas (€)"]
+                inversion_total = valor_compra + inversion_ventas
+            
+                roi_abierto = (pa / valor_compra * 100) if valor_compra != 0 else 0
+                roi_cerrado = (pc / inversion_ventas * 100) if inversion_ventas != 0 else 0
+                roi_global = (pg / inversion_total * 100) if inversion_total != 0 else 0
+            
+                roi_tabla.append({
+                    "Activo": activo,
+                    "ROI abierto (%)": roi_abierto,
+                    "ROI cerrado (%)": roi_cerrado,
+                    "ROI global (%)": roi_global
+                })
+            
+            df_roi = pd.DataFrame(roi_tabla)
+            
+            # Fila total
+            fila_total = {
+                "Activo": "TOTAL",
+                "ROI abierto (%)": (df_tabla_resumen["Posiciones abiertas (€)"].sum() /
+                                    df_resumen["Valor Compra (€)"].sum() * 100) if df_resumen["Valor Compra (€)"].sum() != 0 else 0,
+                "ROI cerrado (%)": (df_tabla_resumen["Posiciones cerradas (€)"].sum() /
+                                     df_resumen["Inversión en Ventas (€)"].sum() * 100) if df_resumen["Inversión en Ventas (€)"].sum() != 0 else 0,
+                "ROI global (%)": (df_tabla_resumen["Posición global (€)"].sum() /
+                                    (df_resumen["Valor Compra (€)"].sum() + df_resumen["Inversión en Ventas (€)"].sum()) * 100) if (df_resumen["Valor Compra (€)"].sum() + df_resumen["Inversión en Ventas (€)"].sum()) != 0 else 0,
+            }
+            df_roi = pd.concat([df_roi, pd.DataFrame([fila_total])], ignore_index=True)
+            
+            # Mostrar tabla
+            st.markdown("### 📈 Tabla de ROI por Activo")
+            
+            st.dataframe(
+                df_roi.style
+                .format({
+                    "ROI abierto (%)": "{:.2f}%",
+                    "ROI cerrado (%)": "{:.2f}%",
+                    "ROI global (%)": "{:.2f}%"
+                })
+                .set_table_styles([
+                    {"selector": "th", "props": [("text-align", "center"), ("font-size", "12px")]},
+                    {"selector": "td", "props": [("text-align", "center"), ("font-size", "12px"), ("padding", "6px")]}
+                ])
+                .applymap(lambda v: 'background-color: #d4f7d4' if isinstance(v, (int, float)) and v > 0 else
+                                     ('background-color: #f7d4d4' if isinstance(v, (int, float)) and v < 0 else ''),
+                           subset=["ROI abierto (%)", "ROI cerrado (%)", "ROI global (%)"]),
+                use_container_width=True
+            )
+
+
+            # --- Tabla resumen final con totales acumulados ---
+
+                        # --- Tabla resumen final con formato personalizado ---
+            
+            total_invertido_abiertas = df_resumen["Valor Compra (€)"].sum()
+            valor_actual_abiertas = df_resumen["Valor Actual (€)"].sum()
+            total_invertido_vendidas = df_resumen["Inversión en Ventas (€)"].sum()
+            total_recibido_ventas = df_resumen["Ingreso por Ventas (€)"].sum()
+            
+            saldo_neto_actual = total_recibido_ventas + valor_actual_abiertas
+            inversion_total = total_invertido_abiertas + total_invertido_vendidas
+            ganancia_perdida_neta = saldo_neto_actual - inversion_total
+            
+            tabla_final = [
+                {
+                    "Concepto": "**Total invertido en posiciones abiertas**",
+                    "Importe (€)": total_invertido_abiertas,
+                    "Descripción": "Dinero total gastado en activos que aún tienes en cartera (valor de compra)."
+                },
+                {
+                    "Concepto": "**Valor actual de posiciones abiertas**",
+                    "Importe (€)": valor_actual_abiertas,
+                    "Descripción": "Valor actual de mercado de los activos que tienes (usando precios actuales)."
+                },
+                {
+                    "Concepto": "**Total invertido en activos vendidos**",
+                    "Importe (€)": total_invertido_vendidas,
+                    "Descripción": "Dinero total gastado en los activos que ya vendiste (FIFO)."
+                },
+                {
+                    "Concepto": "**Total recibido por ventas**",
+                    "Importe (€)": total_recibido_ventas,
+                    "Descripción": "Dinero total que obtuviste por las ventas realizadas."
+                },
+                {
+                    "Concepto": "**Saldo neto actual**",
+                    "Importe (€)": saldo_neto_actual,
+                    "Descripción": "Total recibido por ventas + valor actual de posiciones abiertas."
+                },
+                {
+                    "Concepto": "**Inversión total realizada**",
+                    "Importe (€)": inversion_total,
+                    "Descripción": "Total invertido en posiciones abiertas + invertido en activos vendidos."
+                },
+                {
+                    "Concepto": "**Ganancia/pérdida neta**",
+                    "Importe (€)": ganancia_perdida_neta,
+                    "Descripción": "Saldo neto actual - inversión total realizada."
+                },
+            ]
+            
+            df_tabla_final = pd.DataFrame(tabla_final)
+            
+            # Mostrar la tabla con formato en Streamlit
+            st.markdown("### 📋 Resumen General de la Cartera")
+            
+            st.dataframe(
+                df_tabla_final.style.format({"Importe (€)": "€{:.2f}"}), 
+                use_container_width=True
+            )
+
+
             
 # --- Cuarta ventana: Posiciones abiertas ---         
 with tab4:
@@ -688,9 +812,29 @@ with tab4:
             st.dataframe(resumen)    
 
 
-            # Gráfico 1: PNL No Realizado por Activo
+            # Gráfico 1: PNL No Realizado por Activo con barra Total y orden descendente
+
+            # Copia del resumen
+            df_grafico = df_resumen[["Activo", "PNL No Realizado (€)"]].copy()
+            
+            # Calcular Total
+            total_pnl = df_grafico["PNL No Realizado (€)"].sum()
+            
+            # Crear fila Total
+            fila_total = pd.DataFrame({
+                "Activo": ["Total"],
+                "PNL No Realizado (€)": [total_pnl]
+            })
+            
+            # Concatenar
+            df_grafico_total = pd.concat([df_grafico, fila_total], ignore_index=True)
+            
+            # Ordenar de mayor a menor
+            df_grafico_total = df_grafico_total.sort_values(by="PNL No Realizado (€)", ascending=False)
+            
+            # Crear gráfico ordenado
             fig_pnl = px.bar(
-                df_resumen,
+                df_grafico_total,
                 x="PNL No Realizado (€)",
                 y="Activo",
                 orientation='h',
@@ -698,7 +842,10 @@ with tab4:
                 color_continuous_scale=["red", "green"],
                 title="PNL No Realizado por Activo"
             )
+            
             st.plotly_chart(fig_pnl, use_container_width=True)
+
+
 
             # Gráfico 2: Distribución de Valor Actual por Activo
             if df_resumen["Valor Actual (€)"].sum() > 0:
@@ -715,7 +862,7 @@ with tab4:
                 df_resumen,
                 x="Activo",
                 y=["Valor Compra (€)", "Valor Actual (€)"],
-                barmode="group",
+                barmode="group", 
                 title="Valor de Compra vs Valor Actual por Activo"
             )
             st.plotly_chart(fig_comp, use_container_width=True)
@@ -737,12 +884,59 @@ with tab5:
             st.session_state.df_transacciones['activo'] == activo_seleccionado
         ].sort_values('fecha')
 
+        # Función FIFO con columna de precio FIFO de compra
+        def calcular_ganancias_fifo(transacciones):
+            compras = []
+            resultados = []
+
+            for _, row in transacciones.iterrows():
+                tipo = row['tipo']
+                cantidad = row['cantidad']
+                precio = row['precio_unitario']
+                fecha = row['fecha']
+
+                if tipo == 'compra':
+                    compras.append({'cantidad': cantidad, 'precio': precio})
+                elif tipo == 'venta':
+                    cantidad_a_vender = cantidad
+                    while cantidad_a_vender > 0 and compras:
+                        lote = compras[0]
+                        cantidad_disponible = lote['cantidad']
+                        cantidad_usada = min(cantidad_disponible, cantidad_a_vender)
+
+                        precio_fifo = lote['precio']
+                        ganancia = cantidad_usada * (precio - precio_fifo)
+
+                        resultados.append({
+                            'Fecha de Venta': fecha,
+                            'Cantidad Vendida': cantidad_usada,
+                            'Precio de Venta (€)': precio,
+                            'Precio FIFO Compra (€)': precio_fifo,
+                            'Ganancia (€)': ganancia
+                        })
+
+                        lote['cantidad'] -= cantidad_usada
+                        cantidad_a_vender -= cantidad_usada
+
+                        if lote['cantidad'] == 0:
+                            compras.pop(0)
+
+            return pd.DataFrame(resultados)
+
         df_ganancias = calcular_ganancias_fifo(transacciones_activo)
 
         st.subheader(f"Ganancias por ventas FIFO de {activo_seleccionado}")
         if not df_ganancias.empty:
-            st.dataframe(df_ganancias)
-            ganancia_total = df_ganancias['ganancia'].sum()
+            st.dataframe(
+                df_ganancias.style.format({
+                    'Precio de Venta (€)': "€{:.2f}",
+                    'Precio FIFO Compra (€)': "€{:.2f}",
+                    'Ganancia (€)': "€{:.2f}"
+                }),
+                use_container_width=True
+            )
+
+            ganancia_total = df_ganancias['Ganancia (€)'].sum()
             st.markdown(f"**Ganancia total:** €{ganancia_total:.2f}")
         else:
             st.write("No hay ventas registradas para este activo.")
@@ -763,8 +957,8 @@ with tab5:
 
         inversion_total = calcular_inversion_total(transacciones_activo)
 
-        if inversion_total > 0 and not df_ganancias.empty and 'ganancia' in df_ganancias.columns:
-            roi = (df_ganancias['ganancia'].sum() / inversion_total) * 100
+        if inversion_total > 0 and not df_ganancias.empty and 'Ganancia (€)' in df_ganancias.columns:
+            roi = (df_ganancias['Ganancia (€)'].sum() / inversion_total) * 100
             st.markdown(f"**ROI acumulado:** {roi:.2f}%")
         else:
             st.markdown("**ROI acumulado:** No disponible (sin compras o sin ganancias)")
@@ -784,95 +978,12 @@ with tab6:
     else:
         df = st.session_state.df_transacciones.copy()
         df["importe_total"] = df["precio_unitario"].astype(float) * df["cantidad"].astype(float)
-        df["año"] = pd.to_datetime(df["fecha"]).dt.year
+        df["fecha"] = pd.to_datetime(df["fecha"])
+        df["año"] = df["fecha"].dt.year
 
-        # Función FIFO para ganancia total (ya la tienes)
-        def calcular_ganancia_fifo(grupo):
-            grupo = grupo.sort_values('fecha').copy()
-            inventario = []
-            ganancia_total = 0.0
-
-            for _, fila in grupo.iterrows():
-                tipo = fila['tipo']
-                cantidad = fila['cantidad']
-                precio_unitario = fila['precio_unitario']
-
-                if tipo == 'compra':
-                    inventario.append({'cantidad': cantidad, 'precio_unitario': precio_unitario})
-                elif tipo == 'venta':
-                    cantidad_a_vender = cantidad
-                    coste_venta = 0.0
-
-                    while cantidad_a_vender > 0 and inventario:
-                        lote = inventario[0]
-                        if lote['cantidad'] <= cantidad_a_vender:
-                            coste_venta += lote['cantidad'] * lote['precio_unitario']
-                            cantidad_a_vender -= lote['cantidad']
-                            inventario.pop(0)
-                        else:
-                            coste_venta += cantidad_a_vender * lote['precio_unitario']
-                            lote['cantidad'] -= cantidad_a_vender
-                            cantidad_a_vender = 0
-
-                    ingreso_venta = cantidad * precio_unitario
-                    ganancia_total += ingreso_venta - coste_venta
-
-            return ganancia_total
-
-        # --- Informe resumen por activo y año ---
-        resumen_hacienda = []
-        grupos = df.groupby(["activo", "año"])
-
-        for (activo, año), grupo in grupos:
-            compras = grupo[grupo["tipo"] == "compra"]["importe_total"].sum()
-            ventas = grupo[grupo["tipo"] == "venta"]["importe_total"].sum()
-            ganancia_realizada = calcular_ganancia_fifo(grupo)
-
-            resumen_hacienda.append({
-                "Activo": activo,
-                "Año": año,
-                "Total Compras (€)": compras,
-                "Total Ventas (€)": ventas,
-                "Ganancia/Pérdida Realizada (€)": ganancia_realizada
-            })
-
-        df_resumen_hacienda = pd.DataFrame(resumen_hacienda)
-
-        st.dataframe(
-            df_resumen_hacienda.style.format({
-                "Total Compras (€)": "€{:.2f}",
-                "Total Ventas (€)": "€{:.2f}",
-                "Ganancia/Pérdida Realizada (€)": "€{:.2f}"
-            }),
-            use_container_width=True
-        )
-
-        # Botones para descargar resumen
-        csv_resumen = df_resumen_hacienda.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📄 Descargar resumen para Hacienda (CSV)",
-            data=csv_resumen,
-            file_name="informe_hacienda_resumen.csv",
-            mime="text/csv"
-        )
-
-        output_resumen_excel = io.BytesIO()
-        with pd.ExcelWriter(output_resumen_excel, engine='xlsxwriter') as writer:
-            df_resumen_hacienda.to_excel(writer, index=False, sheet_name='Resumen')
-        output_resumen_excel.seek(0)
-
-        st.download_button(
-            label="📄 Descargar resumen para Hacienda (Excel)",
-            data=output_resumen_excel,
-            file_name="informe_hacienda_resumen.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
-        # --- Tabla detallada de ventas con FIFO ---
-        st.markdown("---")
-        st.subheader("Detalle de cada venta con cálculo FIFO")
-
-        detalle_ventas = []
+        # ---------------------------------------------------
+        # Generar detalle FIFO por cada tramo de venta
+        detalle_fifo = []
 
         activos = df['activo'].unique()
         for activo in activos:
@@ -889,67 +1000,126 @@ with tab6:
                     inventario.append({'cantidad': cantidad, 'precio_unitario': precio_unitario})
                 elif tipo == 'venta':
                     cantidad_a_vender = cantidad
-                    coste_total_compra = 0.0
-                    cantidad_total_vendida = 0.0
 
                     while cantidad_a_vender > 0 and inventario:
                         lote = inventario[0]
                         if lote['cantidad'] <= cantidad_a_vender:
-                            coste_total_compra += lote['cantidad'] * lote['precio_unitario']
-                            cantidad_a_vender -= lote['cantidad']
-                            cantidad_total_vendida += lote['cantidad']
+                            cantidad_vendida = lote['cantidad']
+                            coste_compra = cantidad_vendida * lote['precio_unitario']
                             inventario.pop(0)
                         else:
-                            coste_total_compra += cantidad_a_vender * lote['precio_unitario']
-                            lote['cantidad'] -= cantidad_a_vender
-                            cantidad_total_vendida += cantidad_a_vender
-                            cantidad_a_vender = 0
+                            cantidad_vendida = cantidad_a_vender
+                            coste_compra = cantidad_vendida * lote['precio_unitario']
+                            lote['cantidad'] -= cantidad_vendida
 
-                    if cantidad_total_vendida > 0:
-                        precio_medio_compra = coste_total_compra / cantidad_total_vendida
-                        balance = (precio_unitario - precio_medio_compra) * cantidad_total_vendida
-                    else:
-                        precio_medio_compra = 0
-                        balance = 0
+                        cantidad_a_vender -= cantidad_vendida
+                        precio_medio_compra = coste_compra / cantidad_vendida
+                        balance = (precio_unitario - precio_medio_compra) * cantidad_vendida
 
-                    detalle_ventas.append({
-                        "Activo": activo,
-                        "Fecha venta": fecha,
-                        "Cantidad vendida": cantidad_total_vendida,
-                        "Precio medio compra (€)": precio_medio_compra,
-                        "Precio venta (€)": precio_unitario,
-                        "Balance (€)": balance
-                    })
+                        detalle_fifo.append({
+                            "Activo": activo,
+                            "Fecha venta": fecha,
+                            "Año": fecha.year,
+                            "Cantidad vendida": cantidad_vendida,
+                            "Precio medio compra (€)": precio_medio_compra,
+                            "Precio venta (€)": precio_unitario,
+                            "Balance (€)": balance
+                        })
 
-        df_detalle_ventas = pd.DataFrame(detalle_ventas)
+        df_detalle_fifo = pd.DataFrame(detalle_fifo)
+
+        # --- FILTRO AÑO PARA EL RESUMEN ---
+        años_disponibles_resumen = df_detalle_fifo['Año'].unique()
+        año_seleccionado_resumen = st.selectbox(
+            "Filtrar resumen por año fiscal",
+            options=sorted(años_disponibles_resumen)
+        )
+
+        # Resumen por activo y año, sumando valores del detalle FIFO
+        resumen_hacienda = df_detalle_fifo.groupby(['Activo', 'Año']).agg(
+            **{
+                'Total Compras (€)': ('Precio medio compra (€)', lambda x: (x * df_detalle_fifo.loc[x.index, 'Cantidad vendida']).sum()),
+                'Total Ventas (€)': ('Precio venta (€)', lambda x: (x * df_detalle_fifo.loc[x.index, 'Cantidad vendida']).sum()),
+                'Ganancia/Pérdida Realizada (€)': ('Balance (€)', 'sum')
+            }
+        ).reset_index()
+
+        # Filtrar resumen por año seleccionado
+        df_resumen_filtrado = resumen_hacienda[resumen_hacienda['Año'] == año_seleccionado_resumen]
+
+        # Mostrar resumen filtrado
+        st.dataframe(
+            df_resumen_filtrado.style.format({
+                "Total Compras (€)": "€{:.2f}",
+                "Total Ventas (€)": "€{:.2f}",
+                "Ganancia/Pérdida Realizada (€)": "€{:.2f}"
+            }),
+            use_container_width=True
+        )
+
+        # Descargar resumen CSV
+        csv_resumen = df_resumen_filtrado.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label=f"📄 Descargar resumen para Hacienda {año_seleccionado_resumen} (CSV)",
+            data=csv_resumen,
+            file_name=f"informe_hacienda_resumen_{año_seleccionado_resumen}.csv",
+            mime="text/csv"
+        )
+
+        # Descargar resumen Excel
+        output_resumen_excel = io.BytesIO()
+        with pd.ExcelWriter(output_resumen_excel, engine='xlsxwriter') as writer:
+            df_resumen_filtrado.to_excel(writer, index=False, sheet_name='Resumen')
+        output_resumen_excel.seek(0)
+        st.download_button(
+            label=f"📄 Descargar resumen para Hacienda {año_seleccionado_resumen} (Excel)",
+            data=output_resumen_excel,
+            file_name=f"informe_hacienda_resumen_{año_seleccionado_resumen}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+        st.markdown("---")
+        # Mostrar título del detalle FIFO
+        st.subheader(f"Detalle FIFO de cada tramo de venta ({año_seleccionado_resumen})")
+
+        # FILTRO AÑO PARA EL DETALLE FIFO (DEBAJO DEL TÍTULO)
+        años_disponibles_detalle = df_detalle_fifo['Año'].unique()
+        año_seleccionado_detalle = st.selectbox(
+            "Filtrar detalle FIFO por año fiscal",
+            options=sorted(años_disponibles_detalle),
+            index=list(sorted(años_disponibles_detalle)).index(año_seleccionado_resumen),
+            key='filtro_detalle_fifo'
+        )
+
+        df_detalle_filtrado = df_detalle_fifo[df_detalle_fifo['Año'] == año_seleccionado_detalle]
 
         st.dataframe(
-            df_detalle_ventas.style.format({
-                "Precio medio compra (€)": "€{:.2f}",
-                "Precio venta (€)": "€{:.2f}",
-                "Balance (€)": "€{:.2f}",
+            df_detalle_filtrado.style.format({
+                "Precio medio compra (€)": "€{:.4f}",
+                "Precio venta (€)": "€{:.4f}",
+                "Balance (€)": "€{:.4f}",
                 "Cantidad vendida": "{:.6f}"
             }),
             use_container_width=True
         )
 
-        # Botones para descargar detalle
-        csv_detalle = df_detalle_ventas.to_csv(index=False).encode('utf-8')
+        # Descargar detalle FIFO CSV
+        csv_detalle = df_detalle_filtrado.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📄 Descargar detalle de ventas (CSV)",
+            label=f"📄 Descargar detalle FIFO ventas {año_seleccionado_detalle} (CSV)",
             data=csv_detalle,
-            file_name="detalle_ventas.csv",
+            file_name=f"detalle_fifo_ventas_{año_seleccionado_detalle}.csv",
             mime="text/csv"
         )
 
+        # Descargar detalle FIFO Excel
         output_detalle_excel = io.BytesIO()
         with pd.ExcelWriter(output_detalle_excel, engine='xlsxwriter') as writer:
-            df_detalle_ventas.to_excel(writer, index=False, sheet_name='Detalle Ventas')
+            df_detalle_filtrado.to_excel(writer, index=False, sheet_name='Detalle FIFO')
         output_detalle_excel.seek(0)
-
         st.download_button(
-            label="📄 Descargar detalle de ventas (Excel)",
+            label=f"📄 Descargar detalle FIFO ventas {año_seleccionado_detalle} (Excel)",
             data=output_detalle_excel,
-            file_name="detalle_ventas.xlsx",
+            file_name=f"detalle_fifo_ventas_{año_seleccionado_detalle}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
