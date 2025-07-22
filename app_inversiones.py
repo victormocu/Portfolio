@@ -175,14 +175,21 @@ with tab1:
         tipo = st.selectbox('Tipo de transacción', ['compra', 'venta'])
         tipo_activo = st.selectbox('Tipo de activo', ['ETF', 'Cripto', 'Acción', 'Bono', 'Materia Prima', 'Otro'])
         activo = st.text_input('Nombre del activo (ej. BTC, SPY, AAPL...)')
+        # Cantidad
         cantidad = st.number_input(
             'Cantidad',
             min_value=0.0,
-            value=1.0,
-            step=0.00000001,
-            format="%.8f"
+            value=0.0,
+            step=0.00000001
         )
-        precio = st.number_input('Precio unitario (€)', min_value=0.0, format="%.2f")
+        
+        # Precio unitario
+        precio = st.number_input(
+            'Precio unitario (€)',
+            min_value=0.0,
+            value=0.0,
+            step=0.00000001
+        )
         fecha = st.date_input('Fecha')
         submitted = st.form_submit_button('Añadir transacción')
 
